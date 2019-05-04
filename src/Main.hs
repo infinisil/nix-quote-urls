@@ -2,29 +2,32 @@
 
 module Main where
 
-import           Data.IntMap.Strict (IntMap)
-import qualified Data.IntMap.Strict as IntMap
-import           Data.IntSet        (IntSet)
-import qualified Data.IntSet        as IntSet
-import           Data.List          (intercalate)
-import           Data.Maybe         (mapMaybe)
-import           Data.Text          (Text)
-import qualified Data.Text          as Text
-import qualified Data.Text.IO       as TIO
-import           Nix
-import           System.Environment (getArgs)
+import           Data.IntMap.Strict        (IntMap)
+import qualified Data.IntMap.Strict        as IntMap
+import           Data.IntSet               (IntSet)
+import qualified Data.IntSet               as IntSet
+import           Data.List                 (intercalate)
+import           Data.Maybe                (mapMaybe)
+import           Data.Text                 (Text)
+import qualified Data.Text                 as Text
+import qualified Data.Text.IO              as TIO
+import           Data.Text.Prettyprint.Doc (pretty)
+import           Nix                       hiding (parse)
+import           System.Environment        (getArgs)
+import           Text.Megaparsec
 
 -- | Quotes all unquoted urls in the files given as arguments
 main :: IO ()
 main = mapM_ processFile =<< getArgs
+
 
 -- | Quotes all unquoted urls in a single file
 processFile :: FilePath -> IO ()
 processFile path = do
   putStrLn $ "Processing file " ++ path
   content <- TIO.readFile path
-  case quotesToInsert content of
-    Failure err -> putStrLn $ "  Failed to parse, " ++ show err
+  case quotesToInsert path content of
+    Failure err -> print err
     Success quotes | null quotes -> putStrLn "  No quotes needed"
     Success quotes -> do
       _ <- flip IntMap.traverseWithKey quotes $ \line columns ->
@@ -36,8 +39,18 @@ processFile path = do
 -- | A map from line numbers to the set of columns it needs quotes inserted at
 type QuotePositions = IntMap IntSet
 
-quotesToInsert :: Text -> Result QuotePositions
-quotesToInsert content = findUnquotedStrings <$> parseNixTextLoc content
+-- | A parser for a Nix expression that returns source spans where tabs correspond to a single character,
+oneWideTabParser :: Parser NExprLoc
+oneWideTabParser = do
+  updateParserState $ \old -> old { statePosState = (statePosState old) { pstateTabWidth = pos1 } }
+  whiteSpace *> nixToplevelForm <* eof
+
+-- | Parses a nix file and returns all quotes that need to be inserted
+quotesToInsert :: FilePath -> Text -> Result QuotePositions
+quotesToInsert path content = either
+  (Failure . pretty . errorBundlePretty)
+  (Success . findUnquotedStrings)
+  (parse oneWideTabParser path content)
 
 -- | Checks whether a string expression is quoted or not
 isUnquoted :: NString NExprLoc -> SrcSpan -> Bool
