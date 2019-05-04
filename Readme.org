@@ -1,0 +1,16 @@
+* nix-quote-urls
+
+This is a simple program to quote all URLs in a Nix file, written for [[https://github.com/NixOS/rfcs/pull/45][RFC45]]. It uses [[https://github.com/haskell-nix/hnix][hnix]] to parse the files. Treats all arguments as filenames.
+
+**Warning**: Does not handle tabs correctly yet.
+
+#+BEGIN_SRC bash
+$ cat test.nix
+{ foo = https://example.com; }
+$ alias nix-quote-urls="$(nix-build --no-out-link https://github.com/infinisil/nix-quote-urls/tarball/master)/bin/nix-quote-urls"
+$ nix-quote-urls test.nix
+Processing file test.nix
+  Inserting quotes on line 0 at columns 8, 27
+$ cat test.nix
+{ foo = "https://example.com"; }
+#+END_SRC
