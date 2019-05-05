@@ -18,6 +18,12 @@ let
     ]) {};
 
     hnix = hlib.overrideCabal super.hnix (old: {
+      enableLibraryProfiling = false;
+      patches = [(pkgs.fetchpatch {
+        name = "nixUri-span";
+        url = "https://github.com/infinisil/hnix/commit/ad67c6bfaf9145d12e82055eb5ce37b1af691319.patch";
+        sha256 = "19l4wcp5npll4gcz86fmfdhz5ax0w70286r6l33gq3yyz26iqcwg";
+      })];
       broken = false;
     });
   });
