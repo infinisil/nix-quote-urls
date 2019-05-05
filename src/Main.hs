@@ -101,22 +101,24 @@ findUnquotedStrings (AnnE sp (NStr str))
 findUnquotedStrings (AnnE _ val) = let
     inBinding (NamedVar _ expr _) = findUnquotedStrings expr
     inBinding Inherit {}          = IntMap.empty
+    combines = IntMap.unionsWith IntSet.union
+    combine = IntMap.unionWith IntSet.union
   in case val of
-    (NList vals) -> IntMap.unions $ map findUnquotedStrings vals
-    (NSet bindings) -> IntMap.unions $ map inBinding bindings
-    (NRecSet bindings) -> IntMap.unions $ map inBinding bindings
+    (NList vals) -> combines $ map findUnquotedStrings vals
+    (NSet bindings) -> combines $ map inBinding bindings
+    (NRecSet bindings) -> combines $ map inBinding bindings
     (NUnary _ expr) -> findUnquotedStrings expr
-    (NBinary _ left right) -> findUnquotedStrings left `IntMap.union` findUnquotedStrings right
+    (NBinary _ left right) -> findUnquotedStrings left `combine` findUnquotedStrings right
     (NSelect left _ Nothing) -> findUnquotedStrings left
-    (NSelect left _ (Just right)) -> findUnquotedStrings left `IntMap.union` findUnquotedStrings right
-    (NAbs params expr) -> findUnquotedStrings expr `IntMap.union` paramStrings where
+    (NSelect left _ (Just right)) -> findUnquotedStrings left `combine` findUnquotedStrings right
+    (NAbs params expr) -> findUnquotedStrings expr `combine` paramStrings where
       paramStrings = case params of
-        ParamSet set _ _ -> IntMap.unions $ map findUnquotedStrings $ mapMaybe snd set
+        ParamSet set _ _ -> combines $ map findUnquotedStrings $ mapMaybe snd set
         _                -> IntMap.empty
-    (NLet bindings expr) -> findUnquotedStrings expr `IntMap.union` IntMap.unions (map inBinding bindings)
-    (NIf cond left right) -> findUnquotedStrings cond `IntMap.union` findUnquotedStrings left `IntMap.union` findUnquotedStrings right
-    (NWith left right) -> findUnquotedStrings left `IntMap.union` findUnquotedStrings right
-    (NAssert left right) -> findUnquotedStrings left `IntMap.union` findUnquotedStrings right
+    (NLet bindings expr) -> findUnquotedStrings expr `combine` combines (map inBinding bindings)
+    (NIf cond left right) -> findUnquotedStrings cond `combine` findUnquotedStrings left `combine` findUnquotedStrings right
+    (NWith left right) -> findUnquotedStrings left `combine` findUnquotedStrings right
+    (NAssert left right) -> findUnquotedStrings left `combine` findUnquotedStrings right
     _ -> IntMap.empty
 findUnquotedStrings _ = IntMap.empty
 
