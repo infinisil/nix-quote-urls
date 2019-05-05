@@ -12,11 +12,13 @@ cabal-version:       >=1.10
 executable nix-quote-urls
   main-is:             Main.hs
   ghc-options:         -Wall
+  other-modules:       Options
   build-depends:       base >=4.11
                      , hnix
                      , text
                      , containers
                      , megaparsec
                      , prettyprinter
+                     , optparse-applicative
   hs-source-dirs:      src
   default-language:    Haskell2010

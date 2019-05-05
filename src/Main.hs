@@ -2,6 +2,9 @@
 
 module Main where
 
+import           Options
+
+import           Control.Monad
 import           Data.IntMap.Strict        (IntMap)
 import qualified Data.IntMap.Strict        as IntMap
 import           Data.IntSet               (IntSet)
@@ -13,13 +16,14 @@ import qualified Data.Text                 as Text
 import qualified Data.Text.IO              as TIO
 import           Data.Text.Prettyprint.Doc (pretty)
 import           Nix                       hiding (parse)
-import           System.Environment        (getArgs)
 import           Text.Megaparsec
+
 
 -- | Quotes all unquoted urls in the files given as arguments
 main :: IO ()
-main = mapM_ processFile =<< getArgs
-
+main = do
+  opts <- getOptions
+  forM_ (optFiles opts) processFile
 
 -- | Quotes all unquoted urls in a single file
 processFile :: FilePath -> IO ()
