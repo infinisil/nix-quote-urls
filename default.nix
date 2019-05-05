@@ -19,6 +19,7 @@ let
 
     hnix = hlib.overrideCabal super.hnix (old: {
       enableLibraryProfiling = false;
+      # https://github.com/haskell-nix/hnix/pull/498
       patches = [(pkgs.fetchpatch {
         name = "nixUri-span";
         url = "https://github.com/infinisil/hnix/commit/ad67c6bfaf9145d12e82055eb5ce37b1af691319.patch";
