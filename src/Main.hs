@@ -72,7 +72,7 @@ isUnquoted (DoubleQuoted [Plain text]) (SrcSpan begin end) = textLength == spanL
   -- strings, but we can work around it by comparing the string length with
   -- the span of it, which will only be equal if there aren't any quotes
   textLength = Text.length text
-  spanLength = unPos (sourceColumn begin) - unPos (sourceColumn end)
+  spanLength = unPos (sourceColumn end) - unPos (sourceColumn begin)
 isUnquoted _ _ = False
 
 -- | Inserts quotes into the input text according to the given quote positions
