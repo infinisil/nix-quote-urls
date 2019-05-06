@@ -7,7 +7,7 @@ $ cat test.nix
 { foo = https://example.com; }
 $ alias nix-quote-urls="$(nix-build --no-out-link \
   https://github.com/infinisil/nix-quote-urls/tarball/master)/bin/nix-quote-urls"
-$ nix-quote-urls test.nix
+$ nix-quote-urls fixup test.nix
 Processing file test.nix
   Inserting quotes on line 0 at columns 8, 27
 $ cat test.nix
