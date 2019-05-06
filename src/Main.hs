@@ -1,10 +1,13 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 module Main where
 
 import           Options
 
 import           Control.Monad
+import           Data.Fix
 import           Data.IntMap.Strict        (IntMap)
 import qualified Data.IntMap.Strict        as IntMap
 import           Data.IntSet               (IntSet)
@@ -32,16 +35,22 @@ processFile path = do
   content <- TIO.readFile path
   case quotesToInsert path content of
     Failure err -> print err
-    Success quotes | null quotes -> putStrLn "  No quotes needed"
-    Success quotes -> do
+    Success (QuotePositions quotes) | null quotes -> putStrLn "  No quotes needed"
+    Success (QuotePositions quotes) -> do
       _ <- flip IntMap.traverseWithKey quotes $ \line columns ->
         putStrLn $ "  Inserting quotes on line " ++ show line ++
           " at columns " ++ intercalate ", " (show <$> IntSet.toAscList columns)
-      let newContent = insertQuotes content quotes
+      let newContent = insertQuotes content (QuotePositions quotes)
       TIO.writeFile path newContent
 
 -- | A map from line numbers to the set of columns it needs quotes inserted at
-type QuotePositions = IntMap IntSet
+newtype QuotePositions = QuotePositions (IntMap IntSet)
+
+instance Semigroup QuotePositions where
+  (QuotePositions left) <> (QuotePositions right) = QuotePositions $ IntMap.unionWith IntSet.union left right
+
+instance Monoid QuotePositions where
+  mempty = QuotePositions IntMap.empty
 
 -- | A parser for a Nix expression that returns source spans where tabs correspond to a single character,
 oneWideTabParser :: Parser NExprLoc
@@ -57,7 +66,7 @@ quotesToInsert path content = either
   (parse oneWideTabParser path content)
 
 -- | Checks whether a string expression is quoted or not
-isUnquoted :: NString NExprLoc -> SrcSpan -> Bool
+isUnquoted :: NString a -> SrcSpan -> Bool
 -- Indented strings can never be unquoted
 isUnquoted (Indented _ _) _ = False
 isUnquoted (DoubleQuoted list) sp = case list of
@@ -72,7 +81,7 @@ isUnquoted (DoubleQuoted list) sp = case list of
 
 -- | Inserts quotes into the input text according to the given quote positions
 insertQuotes :: Text -> QuotePositions -> Text
-insertQuotes original quotes = Text.unlines newLines where
+insertQuotes original (QuotePositions quotes) = Text.unlines newLines where
   originalLines = Text.lines original
   newLines = uncurry newLine <$> zip [0..] originalLines
   newLine i old = maybe old (insertQuotesLine old) $ IntMap.lookup i quotes
@@ -87,38 +96,40 @@ insertQuotesLine line quotes = Text.intercalate "\"" parts where
   fun pos (rest, result) = (before, after : result) where
     (before, after) = Text.splitAt pos rest
 
+-- | Converts a span to a quote positions at the spans begin and end
+spanToQuotes :: SrcSpan -> QuotePositions
+spanToQuotes (SrcSpan begin end) = quoteAt begin <> quoteAt end
+  where quoteAt (SourcePos _ (unPos -> line) (unPos -> column)) = QuotePositions $
+          IntMap.singleton (line - 1) (IntSet.singleton (column - 1))
+
 -- | Finds all unquoted strings in a parsed Nix expression and returns the positions
 -- the string needs quotes at
 findUnquotedStrings :: NExprLoc -> QuotePositions
-findUnquotedStrings (AnnE sp (NStr str))
-  | isUnquoted str sp = IntMap.singleton line $ IntSet.fromAscList [ firstQuote, secondQuote ]
-  | otherwise = IntMap.empty
+findUnquotedStrings = cata $ \case
+  Compose (Ann sp value) -> case value of
+    NConstant _ -> mempty
+    NStr str
+      | isUnquoted str sp -> spanToQuotes sp
+      | otherwise -> mempty
+    NSym _ -> mempty
+    NList vals -> mconcat vals
+    NSet bindings -> mconcat $ map inBinding bindings
+    NRecSet bindings -> mconcat $ map inBinding bindings
+    NLiteralPath _ -> mempty
+    NEnvPath _  -> mempty
+    NUnary _ expr -> expr
+    NBinary _ left right -> left <> right
+    NSelect left _ Nothing -> left
+    NSelect left _ (Just right) -> left <> right
+    NHasAttr expr _ -> expr
+    NAbs (ParamSet set _ _) expr -> mconcat (mapMaybe snd set) <> expr
+    NAbs _ expr -> expr
+    NLet bindings expr -> mconcat (map inBinding bindings) <> expr
+    NIf cond left right -> cond <> left <> right
+    NWith left right -> left <> right
+    NAssert left right -> left <> right
+    NSynHole _ -> mempty
   where
-    -- Subtract 1 because positions in megaparsec are 1-indexed
-    line = unPos (sourceLine (spanBegin sp)) - 1
-    firstQuote = unPos (sourceColumn (spanBegin sp)) - 1
-    secondQuote = unPos (sourceColumn (spanEnd sp)) - 1
-findUnquotedStrings (AnnE _ val) = let
-    inBinding (NamedVar _ expr _) = findUnquotedStrings expr
-    inBinding Inherit {}          = IntMap.empty
-    combines = IntMap.unionsWith IntSet.union
-    combine = IntMap.unionWith IntSet.union
-  in case val of
-    (NList vals) -> combines $ map findUnquotedStrings vals
-    (NSet bindings) -> combines $ map inBinding bindings
-    (NRecSet bindings) -> combines $ map inBinding bindings
-    (NUnary _ expr) -> findUnquotedStrings expr
-    (NBinary _ left right) -> findUnquotedStrings left `combine` findUnquotedStrings right
-    (NSelect left _ Nothing) -> findUnquotedStrings left
-    (NSelect left _ (Just right)) -> findUnquotedStrings left `combine` findUnquotedStrings right
-    (NAbs params expr) -> findUnquotedStrings expr `combine` paramStrings where
-      paramStrings = case params of
-        ParamSet set _ _ -> combines $ map findUnquotedStrings $ mapMaybe snd set
-        _                -> IntMap.empty
-    (NLet bindings expr) -> findUnquotedStrings expr `combine` combines (map inBinding bindings)
-    (NIf cond left right) -> findUnquotedStrings cond `combine` findUnquotedStrings left `combine` findUnquotedStrings right
-    (NWith left right) -> findUnquotedStrings left `combine` findUnquotedStrings right
-    (NAssert left right) -> findUnquotedStrings left `combine` findUnquotedStrings right
-    _ -> IntMap.empty
-findUnquotedStrings _ = IntMap.empty
+    inBinding (NamedVar _ expr _) = expr
+    inBinding Inherit {}          = mempty
 
