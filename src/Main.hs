@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Main where
 
@@ -67,17 +66,14 @@ quotesToInsert path content = either
 
 -- | Checks whether a string expression is quoted or not
 isUnquoted :: NString a -> SrcSpan -> Bool
--- Indented strings can never be unquoted
-isUnquoted (Indented _ _) _ = False
-isUnquoted (DoubleQuoted list) sp = case list of
   -- Unquoted strings must have exactly one non-antiquoted, plain element
-  [Plain text] -> textLength == spanLength where
-    -- hnix doesn't directly allow us to differentiate between quoted and unquoted
-    -- strings, but we can work around it by comparing the string length with
-    -- the span of it, which will only be equal if there aren't any quotes
-    textLength = Text.length text
-    spanLength = unPos (sourceColumn (spanEnd sp)) - unPos (sourceColumn (spanBegin sp))
-  _ -> False
+isUnquoted (DoubleQuoted [Plain text]) (SrcSpan begin end) = textLength == spanLength where
+  -- hnix doesn't directly allow us to differentiate between quoted and unquoted
+  -- strings, but we can work around it by comparing the string length with
+  -- the span of it, which will only be equal if there aren't any quotes
+  textLength = Text.length text
+  spanLength = unPos (sourceColumn begin) - unPos (sourceColumn end)
+isUnquoted _ _ = False
 
 -- | Inserts quotes into the input text according to the given quote positions
 insertQuotes :: Text -> QuotePositions -> Text
@@ -99,8 +95,8 @@ insertQuotesLine line quotes = Text.intercalate "\"" parts where
 -- | Converts a span to a quote positions at the spans begin and end
 spanToQuotes :: SrcSpan -> QuotePositions
 spanToQuotes (SrcSpan begin end) = quoteAt begin <> quoteAt end
-  where quoteAt (SourcePos _ (unPos -> line) (unPos -> column)) = QuotePositions $
-          IntMap.singleton (line - 1) (IntSet.singleton (column - 1))
+  where quoteAt (SourcePos _ line column) = QuotePositions $
+          IntMap.singleton (unPos line - 1) (IntSet.singleton (unPos column - 1))
 
 -- | Finds all unquoted strings in a parsed Nix expression and returns the positions
 -- the string needs quotes at
