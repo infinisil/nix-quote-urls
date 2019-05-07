@@ -20,6 +20,8 @@ executable nix-quote-urls
                      , prettyprinter
                      , optparse-applicative
                      , data-fix
+                     , directory
+                     , filepath
   hs-source-dirs:      app
   default-language:    Haskell2010
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
@@ -10,13 +11,26 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.IntSet        as IntSet
 import           Data.List          (intercalate)
 import qualified Data.Text.IO       as TIO
+import           System.Directory
+import           System.FilePath
 
+-- | Returns all Nix files for a path, recursing into directories
+nixFiles :: FilePath -> IO [FilePath]
+nixFiles path = do
+  isDir <- doesDirectoryExist path
+  case (isDir, takeExtension path) of
+    (False, ".nix") -> return [path]
+    (False, _) -> return []
+    (True, _) -> do
+      contents <- fmap (path </>) <$> listDirectory path
+      concat <$> traverse nixFiles contents
 
 -- | Quotes all unquoted urls in the files given as arguments
 main :: IO ()
 main = do
-  opts <- getOptions
-  forM_ (optFiles opts) processFile
+  Options { optPaths } <- getOptions
+  files <- concat <$> traverse nixFiles optPaths
+  forM_ files processFile
 
 -- | Quotes all unquoted urls in a single file
 processFile :: FilePath -> IO ()
