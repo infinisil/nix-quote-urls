@@ -11,11 +11,15 @@ let
   hlib = pkgs.haskell.lib;
 
   hpkgs = pkgs.haskell.packages.ghc864.extend (self: super: {
-    nix-quote-urls = self.callCabal2nix "nix-quote-urls" (lib.sourceByRegex ./. [
+    nix-quote-urls = hlib.overrideCabal (self.callCabal2nix "nix-quote-urls" (lib.sourceByRegex ./. [
       "^\\src.*$"
+      "^\\app.*$"
+      "^\\tests.*$"
       "^.*\\.cabal$"
       "^LICENSE$"
-    ]) {};
+    ]) {}) {
+      enableLibraryProfiling = false;
+    };
 
     hnix = hlib.overrideCabal super.hnix (old: {
       enableLibraryProfiling = false;
