@@ -67,8 +67,8 @@ isUnquoted _ _ = False
 
 -- | Inserts quotes into the input text according to the given quote positions
 insertQuotes :: Text -> QuotePositions -> Text
-insertQuotes original (QuotePositions quotes) = Text.unlines newLines where
-  originalLines = Text.lines original
+insertQuotes original (QuotePositions quotes) = Text.intercalate "\n" newLines where
+  originalLines = Text.splitOn "\n" original
   newLines = uncurry newLine <$> zip [0..] originalLines
   newLine i old = maybe old (insertQuotesLine old) $ IntMap.lookup i quotes
 
@@ -96,7 +96,12 @@ findUnquotedStrings = cata $ \case
     NConstant _ -> mempty
     NStr str
       | isUnquoted str sp -> spanToQuotes sp
-      | otherwise -> mempty
+      | otherwise -> forString str
+      where
+        forString (DoubleQuoted list) = mconcat $ map forAntiquoted list
+        forString (Indented _ list)   = mconcat $ map forAntiquoted list
+        forAntiquoted (Antiquoted expr) = expr
+        forAntiquoted _                 = mempty
     NSym _ -> mempty
     NList vals -> mconcat vals
     NSet bindings -> mconcat $ map inBinding bindings
