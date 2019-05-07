@@ -12,7 +12,21 @@ cabal-version:       >=1.10
 executable nix-quote-urls
   main-is:             Main.hs
   ghc-options:         -Wall
-  other-modules:       Options
+  build-depends:       base >=4.11
+                     , nix-quote-urls
+                     , text
+                     , containers
+                     , megaparsec
+                     , prettyprinter
+                     , optparse-applicative
+                     , data-fix
+  hs-source-dirs:      app
+  default-language:    Haskell2010
+
+library
+  exposed-modules:     Options
+                       Lib
+  ghc-options:         -Wall
   build-depends:       base >=4.11
                      , hnix
                      , text
@@ -22,4 +36,17 @@ executable nix-quote-urls
                      , optparse-applicative
                      , data-fix
   hs-source-dirs:      src
+  default-language:    Haskell2010
+
+test-suite nix-quote-urls-tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      tests
+  build-depends:       base >=4.11
+                     , nix-quote-urls
+                     , hspec
+                     , containers
+                     , hnix
+                     , interpolate
+                     , text
+  main-is:             Main.hs
   default-language:    Haskell2010

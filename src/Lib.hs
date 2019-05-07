@@ -1,11 +1,16 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Main where
+module Lib
+  ( QuotePositions(..)
+  , quotesToInsert
+  , insertQuotes
+  , parseNix
+  , findUnquotedStrings
+  , spanToQuotes
+  , Result(..)
+  ) where
 
-import           Options
-
-import           Control.Monad
 import           Data.Fix
 import           Data.IntMap.Strict        (IntMap)
 import qualified Data.IntMap.Strict        as IntMap
@@ -15,41 +20,29 @@ import           Data.List                 (intercalate)
 import           Data.Maybe                (mapMaybe)
 import           Data.Text                 (Text)
 import qualified Data.Text                 as Text
-import qualified Data.Text.IO              as TIO
 import           Data.Text.Prettyprint.Doc (pretty)
 import           Nix                       hiding (parse)
 import           Text.Megaparsec
 
 
--- | Quotes all unquoted urls in the files given as arguments
-main :: IO ()
-main = do
-  opts <- getOptions
-  forM_ (optFiles opts) processFile
-
--- | Quotes all unquoted urls in a single file
-processFile :: FilePath -> IO ()
-processFile path = do
-  putStrLn $ "Processing file " ++ path
-  content <- TIO.readFile path
-  case quotesToInsert path content of
-    Failure err -> print err
-    Success (QuotePositions quotes) | null quotes -> putStrLn "  No quotes needed"
-    Success (QuotePositions quotes) -> do
-      _ <- flip IntMap.traverseWithKey quotes $ \line columns ->
-        putStrLn $ "  Inserting quotes on line " ++ show line ++
-          " at columns " ++ intercalate ", " (show <$> IntSet.toAscList columns)
-      let newContent = insertQuotes content (QuotePositions quotes)
-      TIO.writeFile path newContent
-
 -- | A map from line numbers to the set of columns it needs quotes inserted at
-newtype QuotePositions = QuotePositions (IntMap IntSet)
+newtype QuotePositions = QuotePositions (IntMap IntSet) deriving Eq
 
 instance Semigroup QuotePositions where
   (QuotePositions left) <> (QuotePositions right) = QuotePositions $ IntMap.unionWith IntSet.union left right
 
 instance Monoid QuotePositions where
   mempty = QuotePositions IntMap.empty
+
+instance Show QuotePositions where
+  show (QuotePositions quotes) = "QuotePositions " ++ intercalate ", " (map (uncurry fromColumns) (IntMap.toAscList quotes)) where
+    fromColumns file columns = show file ++ ":{" ++ intercalate "," (map show (IntSet.toAscList columns)) ++ "}"
+
+parseNix :: String -> Text -> Either String NExprLoc
+parseNix path input = either
+  (Left . show . pretty . errorBundlePretty)
+  Right
+  (parse oneWideTabParser path input)
 
 -- | A parser for a Nix expression that returns source spans where tabs correspond to a single character,
 oneWideTabParser :: Parser NExprLoc
@@ -58,11 +51,8 @@ oneWideTabParser = do
   whiteSpace *> nixToplevelForm <* eof
 
 -- | Parses a nix file and returns all quotes that need to be inserted
-quotesToInsert :: FilePath -> Text -> Result QuotePositions
-quotesToInsert path content = either
-  (Failure . pretty . errorBundlePretty)
-  (Success . findUnquotedStrings)
-  (parse oneWideTabParser path content)
+quotesToInsert :: FilePath -> Text -> Either String QuotePositions
+quotesToInsert path content = findUnquotedStrings <$> parseNix path content
 
 -- | Checks whether a string expression is quoted or not
 isUnquoted :: NString a -> SrcSpan -> Bool
