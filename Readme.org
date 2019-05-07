@@ -5,7 +5,7 @@ This is a simple program to quote all URLs in Nix files, written for [[https://g
 #+BEGIN_SRC bash
 $ cat test.nix
 { foo = https://example.com; }
-$ alias nix-quote-urls="$(nix-build --no-out-link \
+$ alias nix-quote-urls="$(nix-build --option tarball-ttl 0 --no-out-link \
   https://github.com/infinisil/nix-quote-urls/tarball/master)/bin/nix-quote-urls"
 $ nix-quote-urls fixup test.nix
 Processing file test.nix
