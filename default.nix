@@ -32,6 +32,6 @@ let
       broken = false;
     });
   });
-in hpkgs.nix-quote-urls // {
+in pkgs.haskell.lib.justStaticExecutables hpkgs.nix-quote-urls // {
   inherit pkgs hpkgs;
 }
