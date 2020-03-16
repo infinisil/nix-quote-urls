@@ -12,9 +12,9 @@ let
 
   hpkgs = pkgs.haskell.packages.ghc864.extend (self: super: {
     nix-quote-urls = hlib.overrideCabal (self.callCabal2nix "nix-quote-urls" (lib.sourceByRegex ./. [
-      "^\\src.*$"
-      "^\\app.*$"
-      "^\\tests.*$"
+      "^src.*$"
+      "^app.*$"
+      "^tests.*$"
       "^.*\\.cabal$"
       "^LICENSE$"
     ]) {}) {
