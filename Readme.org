@@ -1,6 +1,21 @@
 * nix-quote-urls
 
-This is a simple program to quote all URLs in Nix files, written for [[https://github.com/NixOS/rfcs/pull/45][RFC45]]. It uses [[https://github.com/haskell-nix/hnix][hnix]] to parse the files. Treats all arguments as filenames.
+This is a simple program to quote all URLs in Nix files, written for [[https://github.com/NixOS/rfcs/pull/45][RFC45]]. It uses [[https://github.com/haskell-nix/hnix][hnix]] to parse the files. It can verify/fixup all of nixpkgs in ~25 seconds on my machine.
+
+#+BEGIN_SRC source
+nix-quote-urls - a helper against unquoted Nix urls
+
+Usage: nix-quote-urls COMMAND
+  Verify or fixup unquoted URLs in PATH
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  fixup                    Fixup files/directories by quoting all urls
+  verify                   Verify files/directories to not have any unquoted
+                           urls
+#+END_SRC
 
 #+BEGIN_SRC bash
 $ cat test.nix
