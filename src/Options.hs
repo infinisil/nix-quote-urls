@@ -12,11 +12,13 @@ data Options = Options
   }
 
 data Mode = Fixup
+          | Verify
           deriving Show
 
 parser :: Parser Options
 parser = hsubparser
    ( command "fixup" (info (forMode Fixup) (progDesc "Fixup files/directories by quoting all urls"))
+  <> command "verify" (info (forMode Verify) (progDesc "Verify files/directories to not have any unquoted urls"))
    )
 
 forMode :: Mode -> Parser Options
